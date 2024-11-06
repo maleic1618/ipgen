@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-PROG=		ipgen
+PROG=		ipgen webserv
 SRCS=		gen.c util.c webserv.c pbuf.c sequencecheck.c seqtable.c item.c genscript.c flowparse.c pktgen_item.c
 CFLAGS+=	-I.. -I${LOCALBASE}/include -g -DHTDOCS=\"${PREFIX}/share/ipgen/htdocs\"
 CFLAGS+=	-Wall -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith
@@ -46,9 +46,10 @@ cleandir: clean
 	rm -f .depend GPATH GRTAGS GSYMS GTAGS
 
 install:
-	install -o root -g wheel -m 550 ipgen ${DESTDIR}${PREFIX}/bin/
-	install -o root -g wheel -m 755 -d ${DESTDIR}${MANDIR}/man1
-	install -o root -g wheel -m 444 ipgen.1 ${DESTDIR}${MANDIR}/man1
+	${INSTALL_PROGRAM} ipgen ${DESTDIR}${PREFIX}/bin/
+	${INSTALL_PROGRAM} webserv ${DESTDIR}${PREFIX}/bin/
+	${INSTALL} -d ${DESTDIR}${MANDIR}/man1
+	${INSTALL_MAN} ipgen.1 ${DESTDIR}${MANDIR}/man1
 
 sequencecheck: sequencecheck.c seqcheck_test.c
 	$(CC) -o $@ sequencecheck.c $(CFLAGS) -DTEST
