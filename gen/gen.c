@@ -2306,6 +2306,7 @@ usage(void)
 	       "\n"	/* size and speed */
 	       "	-s <size>			specify pktsize (IPv4:46-1500, IPv6:tcp:54-1500)\n"
 	       "	-p <pps>			specify pps\n"
+	       "	--fixed-linkspeed <speed>	specify linkspeed (100M, 1G, ..)"
 	       "\n"	/* L1 or L2 */
 	       "	--ipg				adapt IPG (Inter Packet Gap)\n"
 	       "	--burst				don't set IPG (default)\n"
