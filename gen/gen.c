@@ -176,6 +176,7 @@ char *opt_rfc2544_output_json = NULL;
 int opt_rfc2544_interval = RFC2544_INTERVAL_SECS_DEFAULT;
 int opt_rfc2544_warming_duration = RFC2544_WARMING_SECS_DEFAULT;
 int opt_rfc2544_early_finish = 1;
+uint64_t opt_fixed_linkspeed = 0;
 
 #ifdef IPG_HACK
 int support_ipg = 0;
@@ -3728,6 +3729,7 @@ static struct option longopts[] = {
 	{	"rfc2544-warming-duration",		required_argument,	0,	0	},
 	{	"rfc2544-output-json",		required_argument,	0,	0	},
 	{	"rfc2544-no-early-finish",		no_argument,		0,	0	},
+	{	"fixed-linkspeed",		required_argument,	0,	0	},
 	{	"nocurses",			no_argument,		0,	0	},
 	{	"fail-if-dropped",		no_argument,		0,	0	},
 	{	NULL,				0,			NULL,	0	}
@@ -4278,6 +4280,20 @@ main(int argc, char *argv[])
 				}
 			} else if (strcmp(longopts[optidx].name, "rfc2544-no-early-finish") == 0) {
 				opt_rfc2544_early_finish = 0;
+			} else if (strcmp(longopts[optidx].name, "fixed-linkspeed") == 0) {
+				char *end;
+				opt_fixed_linkspeed = strtoull(optarg, &end, 10);
+				if (opt_fixed_linkspeed < 0) {
+					fprintf(stderr, "illegal fixed linkspeed: %s\n", optarg);
+					exit(1);
+				}
+				if (*end == 'K') {
+					opt_fixed_linkspeed *= 1000ULL;
+				} else if (*end == 'M') {
+					opt_fixed_linkspeed *= 1000000ULL;
+				} else if (*end == 'G') {
+					opt_fixed_linkspeed *= 1000000000ULL;
+				}
 			} else if (strcmp(longopts[optidx].name, "nocurses") == 0) {
 				use_curses = false;
 			} else if (strcmp(longopts[optidx].name, "fail-if-dropped") == 0) {
@@ -4373,46 +4389,50 @@ main(int argc, char *argv[])
 			continue;
 
 		/* Set maxlinkspeed */
-		for (j = 0; j < sizeof(ifflags)/sizeof(ifflags[0]); j++) {
-			uint64_t linkspeed;
-			int trials = 5;
-			while (trials-- > 0) {
-				linkspeed = interface_get_baudrate(ifname[i]);
-				if (linkspeed > 0)
+		if (opt_fixed_linkspeed == 0) {
+			for (j = 0; j < sizeof(ifflags)/sizeof(ifflags[0]); j++) {
+				uint64_t linkspeed;
+				int trials = 5;
+				while (trials-- > 0) {
+					linkspeed = interface_get_baudrate(ifname[i]);
+					if (linkspeed > 0)
+						break;
+					sleep(1);
+				}
+				if (linkspeed == 0) {
+					fprintf(stderr, "%s: failed to determine linkspeed\n", ifname[i]);
+					exit(1);
+				}
+
+				if (linkspeed < IF_Mbps(10)) {
+					/*
+					* If the baudrate is lower than 10Mbps,
+					* something is wrong.
+					*/
+					fprintf(stderr,
+					"%s: WARINIG: baudrate(%lu) < IF_Mbps(10)\n",
+					ifname[i], linkspeed);
+				} else {
+					interface[i].maxlinkspeed = linkspeed;
+					printf_verbose("%s: linkspeed = %lu\n", ifname[i], linkspeed);
 					break;
-				sleep(1);
-			}
-			if (linkspeed == 0) {
-				fprintf(stderr, "%s: failed to determine linkspeed\n", ifname[i]);
-				exit(1);
-			}
+				}
 
-			if (linkspeed < IF_Mbps(10)) {
 				/*
-				 * If the baudrate is lower than 10Mbps,
-				 * something is wrong.
-				 */
-				fprintf(stderr,
-				    "%s: WARINIG: baudrate(%lu) < IF_Mbps(10)\n",
-				    ifname[i], linkspeed);
-			} else {
-				interface[i].maxlinkspeed = linkspeed;
-				printf_verbose("%s: linkspeed = %lu\n", ifname[i], linkspeed);
-				break;
+				* If we failed to get the link speed from sysctl,
+				* get the default link speed from ifflags[] table.
+				*/
+				if (strncmp(ifname[i], ifflags[j].drvname,
+				strnlen(ifflags[j].drvname, IFNAMSIZ)) == 0) {
+					interface[i].maxlinkspeed = ifflags[j].maxlinkspeed;
+					break;
+				}
 			}
-
-			/*
-			 * If we failed to get the link speed from sysctl,
-			 * get the default link speed from ifflags[] table.
-			 */
-			if (strncmp(ifname[i], ifflags[j].drvname,
-			    strnlen(ifflags[j].drvname, IFNAMSIZ)) == 0) {
-				interface[i].maxlinkspeed = ifflags[j].maxlinkspeed;
-				break;
-			}
+			if (interface[i].maxlinkspeed == 0)
+				interface[i].maxlinkspeed = LINKSPEED_1GBPS; /* XXX 10 Gbps */
+		} else {
+			interface[i].maxlinkspeed = opt_fixed_linkspeed;
 		}
-		if (interface[i].maxlinkspeed == 0)
-			interface[i].maxlinkspeed = LINKSPEED_1GBPS; /* XXX 10 Gbps */
 
 		if ((interface[i].af_gwaddr != 0) &&
 		    (memcmp(eth_zero, &interface[i].gweaddr, ETHER_ADDR_LEN) == 0) &&
