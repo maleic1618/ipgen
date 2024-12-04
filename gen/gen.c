@@ -4269,8 +4269,8 @@ main(int argc, char *argv[])
 				opt_rfc2544_output_json = optarg;
 			} else if (strcmp(longopts[optidx].name, "rfc2544-interval") == 0) {
 				opt_rfc2544_interval = strtol(optarg, (char **)NULL, 10);
-				if (opt_rfc2544_interval < 0 || opt_rfc2544_interval > 60) {
-					fprintf(stderr, "illegal interval. must be 0-60: %s\n", optarg);
+				if (opt_rfc2544_interval < 0 || opt_rfc2544_interval > 3600) {
+					fprintf(stderr, "illegal interval. must be 0-3600: %s\n", optarg);
 					exit(1);
 				}
 			} else if (strcmp(longopts[optidx].name, "rfc2544-warming-duration") == 0) {
